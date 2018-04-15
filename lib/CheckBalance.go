@@ -32,7 +32,7 @@ func GetBalance(address string) {
 		if e.Asset.Code != "" {
 			c = e.Asset.Code
 		}
-		fmt.Println("Amount:", e.Balance, "Code:", c)
+		fmt.Println("Amount:", e.Balance, "AssetName:", c)
 	}
 
     //fmt.Println(account.Balances[0].Asset.Code) //Asset.Type, Asset.Code, Asset.Issuer

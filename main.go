@@ -66,6 +66,20 @@ func LoadAccounts(newAcc bool) {
 	}
 }
 
+func signAndSubmit(tx *b.TransactionBuilder, seed []string, privateMemo string){
+
+	txe, err := tx.Sign(seed...)
+	check(err)
+
+	txeB64, err := txe.Base64()
+	check(err)
+
+	resp, err := horizon.DefaultTestNetClient.SubmitTransaction(txeB64)
+	check(err)
+
+	log.Println("Transaction Successfully submitted: ", privateMemo)
+	log.Println("Hash:", resp.Hash)
+}
 
 func CreateAccWithBalance(amount string, sourceSeed string){
 	address, _ := lib.GetNewKey()
@@ -79,24 +93,16 @@ func CreateAccWithBalance(amount string, sourceSeed string){
 
 	check(err)
 
-	txe, err := tx.Sign(sourceSeed)
-	check(err)
-
-	txeB64, err := txe.Base64()
-	check(err)
-
-	resp, err := horizon.DefaultTestNetClient.SubmitTransaction(txeB64)
-	check(err)
-
-	log.Println("Successfully create:", address, "and deposit amount is:", amount, " Hash:", resp.Hash)
-
+	memo := "Create Accounts:" + address + " with " + amount + " lumens"
+	multiSigSeed := []string{sourceSeed}
+	signAndSubmit(tx, multiSigSeed, memo)
 }
 
 func PathPayment() {
 
 }
 
-func ChangeTrust(trusteeSeed string, issuer string){
+func Trust(asset b.Asset, limit string, trusteeSeed string){
 
 	tx, err := b.Transaction(b.SourceAccount{trusteeSeed}, 
 								b.TestNetwork, 
@@ -105,16 +111,49 @@ func ChangeTrust(trusteeSeed string, issuer string){
 								)
 	check(err)
 
-	txe, err := tx.Sign(trusteeSeed)
-	check(err)
+	//fmt.Println(tx, "  ", *tx, "  ", &tx)
+	memo := "Change Trust"
+	multiSigSeed := []string{trusteeSeed}
+	signAndSubmit(tx, multiSigSeed, memo)
+}
 
-	txeB64, err := txe.Base64()
-	check(err)
+func CreateBuyingOffer(rate b.Rate, amount b.Amount, sourceSeed string){
+	tx, err := b.Transaction(b.SourceAccount{sourceSeed}, 
+								b.TestNetwork, 
+								b.AutoSequence{SequenceProvider: horizon.DefaultTestNetClient},
+								b.CreateOffer(rate, amount),
+								)
 
-	resp, err := horizon.DefaultTestNetClient.SubmitTransaction(txeB64)
 	check(err)
+	memo := "Create Buying Offer Successfully: " + rate.Buying.Code 
+	multiSigSeed := []string{sourceSeed}
+	signAndSubmit(tx, multiSigSeed, memo)
+}
 
-	log.Println("Successfully Trust!! Hash:", resp.Hash)
+func CreateSellingOffer(rate b.Rate, amount b.Amount, sourceSeed string){
+	tx, err := b.Transaction(b.SourceAccount{sourceSeed}, 
+								b.TestNetwork, 
+								b.AutoSequence{SequenceProvider: horizon.DefaultTestNetClient},
+								b.CreateOffer(rate, amount),
+								)
+
+	check(err)
+	memo := "Create Selling Offer Successfully: " + rate.Selling.Code 
+	multiSigSeed := []string{sourceSeed}
+	signAndSubmit(tx, multiSigSeed, memo)
+}
+
+func DeleteOffer(rate b.Rate, offerID b.OfferID, sourceSeed string){
+	tx, err := b.Transaction(b.SourceAccount{sourceSeed}, 
+								b.TestNetwork, 
+								b.AutoSequence{SequenceProvider: horizon.DefaultTestNetClient},
+								b.DeleteOffer(rate, offerID),
+								)
+
+	check(err)
+	memo := "Delete Offer Successfully"
+	multiSigSeed := []string{sourceSeed}
+	signAndSubmit(tx, multiSigSeed, memo)
 }
 
 func SendAsset(amount string, sourceSeed string, destAddress string, code string, issuerAddr string){
@@ -127,16 +166,9 @@ func SendAsset(amount string, sourceSeed string, destAddress string, code string
 
 	check(err)
 
-	txe, err := tx.Sign(sourceSeed)
-	check(err)
-
-	txeB64, err := txe.Base64()
-	check(err)
-
-	resp, err := horizon.DefaultTestNetClient.SubmitTransaction(txeB64)
-	check(err)
-
-	log.Println("Successfully sent ", amount, "lumen to", destAddress, ". Hash:", resp.Hash)
+	memo := "SendAsset:" + code + " to " + destAddress
+	multiSigSeed := []string{sourceSeed}
+	signAndSubmit(tx, multiSigSeed, memo)
 }
 
 func SendLumens(amount string, sourceSeed string, destAddress string){
@@ -149,22 +181,30 @@ func SendLumens(amount string, sourceSeed string, destAddress string){
 
 	check(err)
 
-	txe, err := tx.Sign(sourceSeed)
-	check(err)
-
-	txeB64, err := txe.Base64()
-	check(err)
-
-	resp, err := horizon.DefaultTestNetClient.SubmitTransaction(txeB64)
-	check(err)
-
-	log.Println("Successfully sent ", amount, "lumen to", destAddress, ". Hash:", resp.Hash)
+	memo := "SendLumens " + amount + " to " + destAddress
+	multiSigSeed := []string{sourceSeed, "SDQK24QMRQMYKN4BN6U5XHJLNTSDSF4PAJLMCEHYXSEHQCI5JRCMHS5O"}
+	signAndSubmit(tx, multiSigSeed, memo)
 }
 
+func AddNewSigner(sourceSeed string, signerAddress string){
+	tx, err := b.Transaction(b.SourceAccount{sourceSeed}, 
+								b.TestNetwork, 
+								b.AutoSequence{SequenceProvider: horizon.DefaultTestNetClient},
+								b.SetOptions(b.MasterWeight(1),
+											b.SetThresholds(2,2,2),
+											b.AddSigner(signerAddress, 1)),
+								)
+
+	check(err)
+
+	memo := "Successfully Add New Signer!"
+	multiSigSeed := []string{sourceSeed}
+	signAndSubmit(tx, multiSigSeed, memo)
+}
 
 func main() {
 	
-	issuer := "GBG2FDRBZDJ6IROP5XF6P6EKUT23RHFR5F77CNE4BLF5DGAZOVXDJUOX"
+	//issuer := "GBG2FDRBZDJ6IROP5XF6P6EKUT23RHFR5F77CNE4BLF5DGAZOVXDJUOX"
 
 	initFlag()
 
@@ -172,19 +212,37 @@ func main() {
 	LoadAccounts(newAccounts)
 
 	//create account and deposit
-	//CreateAccWithBalance("24", accounts[0].seed)
+	//CreateAccWithBalance("2", accounts[0].seed)
 
-	//Change Trust
-	//ChangeTrust(accounts[0].seed, "sdsdsd")
+	//Trust
+	//GledCreditAsset := b.CreditAsset("Gled", issuer)
+	//Trust(GledCreditAsset, "500", accounts[1].seed)
+
+	//Create Offer
+	/////Buy Gled
+	// buyingRate := b.Rate{Selling: b.NativeAsset(), Buying: GledCreditAsset, Price: "10"}
+	// CreateBuyingOffer(buyingRate, "10", accounts[1].seed) 	
+
+	// ////Sell Gled
+	// sellingRate := b.Rate{Selling: GledCreditAsset, Buying: b.NativeAsset(), Price: "0.5"}
+	// CreateSellingOffer(sellingRate, "30", accounts[0].seed)
+
+	//Delete Offer
+	//deleteRate := b.Rate{Selling: GledCreditAsset, Buying: b.NativeAsset(), Price: "1"}
+	// deleteRate := b.Rate{Selling: b.NativeAsset(), Buying: GledCreditAsset, Price: "10"}
+	// DeleteOffer(deleteRate, 341610, accounts[1].seed)
+
+	//Add new signer
+	//AddNewSigner(accounts[1].seed, accounts[0].address)
 
 	//send lumen
-	//SendLumens("1", accounts[1].seed, accounts[0].address) /// Amount, Sender's seed, Receiver's address 
+	SendLumens("20", accounts[1].seed, accounts[0].address) /// Amount, Sender's seed, Receiver's address 
 
 	//send from issuer to distributor
-	//SendAsset("100000", "SDNYQFFSL7XF7T3JQZJYSRMZTZVI3AFXHGFPICW5HDXDB3WAMR4O5LHG", accounts[0].address, "Gled", issuer)
+	//SendAsset("1000", "SDNYQFFSL7XF7T3JQZJYSRMZTZVI3AFXHGFPICW5HDXDB3WAMR4O5LHG", accounts[0].address, "Gled", issuer)
 
 	//send asset
-	SendAsset("10", accounts[0].seed, accounts[1].address, "Gled", issuer)
+	//SendAsset("1", accounts[0].seed, accounts[1].address, "Gled", issuer)
 
 	//print all account information
 	for _,e := range accounts{
